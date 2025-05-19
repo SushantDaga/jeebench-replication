@@ -6,6 +6,8 @@ Main execution script for LLM evaluation system.
 import os
 import argparse
 import json
+import signal
+import sys
 from typing import Dict, Any, List
 import time
 
@@ -14,7 +16,15 @@ from utils.llm_providers import get_provider
 from utils.prompt_techniques import get_prompt_function
 from utils.response_parser import parse_answer
 from utils.evaluation import is_correct, calculate_accuracy, print_accuracy_report
-from utils.storage import save_results, save_accuracy, save_experiment_config
+from utils.storage import (
+    save_results, 
+    save_accuracy, 
+    save_experiment_config,
+    save_incremental_results,
+    find_latest_checkpoint,
+    load_checkpoint,
+    sanitize_filename
+)
 from config import (
     API_KEYS, 
     DEFAULT_MODELS, 
@@ -27,6 +37,22 @@ from config import (
 
 from collections import Counter
 
+# Global flag to track interruption
+interrupted = False
+
+def signal_handler(sig, frame):
+    """Handle keyboard interrupt (Ctrl+C)"""
+    global interrupted
+    if not interrupted:
+        print("\nKeyboard interrupt received. Completing current evaluation and saving results...")
+        interrupted = True
+    else:
+        print("\nSecond interrupt received. Exiting immediately...")
+        sys.exit(1)
+
+# Register the signal handler
+signal.signal(signal.SIGINT, signal_handler)
+
 def run_evaluation(
     dataset_path: str,
     provider_name: str,
@@ -36,7 +62,10 @@ def run_evaluation(
     output_dir: str = DEFAULT_OUTPUT_DIR,
     limit: int = None,
     verbose: bool = False,
-    llm_params: Dict[str, Any] = None
+    llm_params: Dict[str, Any] = None,
+    resume_from: int = None,
+    checkpoint_path: str = None,
+    save_every: int = 5  # Save every N questions
 ) -> Dict[str, Any]:
     """
     Run evaluation on the dataset
@@ -51,10 +80,49 @@ def run_evaluation(
         limit: Optional limit on number of questions to evaluate
         verbose: Whether to print verbose output
         llm_params: Custom parameters for the LLM API calls
+        resume_from: Index to resume from (0-based)
+        checkpoint_path: Path to a checkpoint file to resume from
+        save_every: Save checkpoint every N questions
         
     Returns:
         Dictionary with evaluation results
     """
+    # Create experiment name (sanitization will be done in the storage functions)
+    experiment_name = f"{provider_name}_{model_name}_{technique}"
+    
+    # Initialize results list and start index
+    results = []
+    start_index = 0
+    
+    # Check if resuming from checkpoint
+    if checkpoint_path:
+        print(f"Loading checkpoint from: {checkpoint_path}")
+        checkpoint_data = load_checkpoint(checkpoint_path)
+        if "results" in checkpoint_data:
+            results = checkpoint_data["results"]
+            if "progress" in checkpoint_data and "current_index" in checkpoint_data["progress"]:
+                start_index = checkpoint_data["progress"]["current_index"]
+            else:
+                # Assume we've completed all questions in the results list
+                start_index = len(results)
+            print(f"Resuming from question {start_index+1}")
+    elif resume_from is not None:
+        start_index = resume_from
+        print(f"Resuming from question {start_index+1}")
+    else:
+        # Look for latest checkpoint if not explicitly specified
+        latest_checkpoint = find_latest_checkpoint(output_dir, experiment_name)
+        if latest_checkpoint:
+            print(f"Found latest checkpoint: {latest_checkpoint}")
+            checkpoint_data = load_checkpoint(latest_checkpoint)
+            if "results" in checkpoint_data:
+                results = checkpoint_data["results"]
+                if "progress" in checkpoint_data and "current_index" in checkpoint_data["progress"]:
+                    start_index = checkpoint_data["progress"]["current_index"]
+                else:
+                    start_index = len(results)
+                print(f"Resuming from question {start_index+1}")
+    
     # Load dataset
     dataset = load_dataset(dataset_path)
     
@@ -71,9 +139,17 @@ def run_evaluation(
     # Use provided parameters or get defaults
     params = llm_params if llm_params is not None else DEFAULT_PARAMS.get(provider_name, {})
     
-    results = []
+    # Track start time for progress reporting
+    start_time = time.time()
     
-    for i, question in enumerate(dataset):
+    # Process questions starting from start_index
+    for i in range(start_index, len(dataset)):
+        # Check for keyboard interrupt
+        if interrupted:
+            print(f"\nInterrupted at question {i+1}/{len(dataset)}. Saving results...")
+            break
+            
+        question = dataset[i]
         print(f"Processing question {i+1}/{len(dataset)}...")
         
         try:
@@ -219,6 +295,17 @@ def run_evaluation(
                 
                 results.append(result)
                 
+                # Save incremental results
+                if (i + 1) % save_every == 0 or interrupted:
+                    checkpoint_path = save_incremental_results(
+                        results,
+                        output_dir,
+                        experiment_name,
+                        i + 1,
+                        len(dataset)
+                    )
+                    print(f"Checkpoint saved: {checkpoint_path}")
+                
             else:
                 # For direct and CoT, we send a single request
                 # Create prompt
@@ -282,6 +369,17 @@ def run_evaluation(
                 
                 results.append(result)
                 
+                # Save incremental results
+                if (i + 1) % save_every == 0 or interrupted:
+                    checkpoint_path = save_incremental_results(
+                        results,
+                        output_dir,
+                        experiment_name,
+                        i + 1,
+                        len(dataset)
+                    )
+                    print(f"Checkpoint saved: {checkpoint_path}")
+                
                 # Add delay to avoid rate limiting
                 time.sleep(1)
                 
@@ -339,6 +437,12 @@ def main():
     parser.add_argument("--limit", type=int, default=None, help="Limit number of questions")
     parser.add_argument("--verbose", action="store_true", help="Print verbose output")
     
+    # Checkpoint and resume arguments
+    parser.add_argument("--resume", action="store_true", help="Resume from the latest checkpoint")
+    parser.add_argument("--resume-from", type=int, help="Resume from a specific question index (0-based)")
+    parser.add_argument("--checkpoint", type=str, help="Path to a specific checkpoint file to resume from")
+    parser.add_argument("--save-every", type=int, default=5, help="Save checkpoint every N questions")
+    
     # LLM parameters
     parser.add_argument("--temperature", type=float, help=PARAM_DESCRIPTIONS["temperature"])
     parser.add_argument("--max-tokens", type=int, help=PARAM_DESCRIPTIONS["max_tokens"])
@@ -386,6 +490,21 @@ def main():
         elif args.provider == "gemini":
             params["stop_sequences"] = args.stop
     
+    # Handle resume options
+    checkpoint_path = None
+    resume_from = None
+    
+    if args.checkpoint:
+        checkpoint_path = args.checkpoint
+    elif args.resume:
+        # Find the latest checkpoint
+        experiment_name = f"{args.provider}_{model}_{args.technique}"
+        checkpoint_path = find_latest_checkpoint(args.output, experiment_name)
+        if not checkpoint_path:
+            print("No checkpoint found to resume from.")
+    elif args.resume_from is not None:
+        resume_from = args.resume_from
+    
     results = run_evaluation(
         dataset_path=args.dataset,
         provider_name=args.provider,
@@ -395,7 +514,10 @@ def main():
         output_dir=args.output,
         limit=args.limit,
         verbose=args.verbose,
-        llm_params=params  # Pass the custom parameters
+        llm_params=params,  # Pass the custom parameters
+        resume_from=resume_from,
+        checkpoint_path=checkpoint_path,
+        save_every=args.save_every
     )
     
     print(f"Evaluation complete!")

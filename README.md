@@ -74,6 +74,7 @@ python main.py --provider openai --technique direct
 
 ### Command Line Arguments
 
+#### Basic Arguments
 - `--dataset`: Path to the dataset file (default: `dataset.json`)
 - `--provider`: LLM provider to use (`openai`, `anthropic`, `gemini`, `openrouter`)
 - `--model`: Model name (if not specified, uses default for provider)
@@ -82,6 +83,12 @@ python main.py --provider openai --technique direct
 - `--output`: Output directory for results (default: `results`)
 - `--limit`: Limit number of questions to evaluate
 - `--verbose`: Print verbose output
+
+#### Checkpoint and Resume Arguments
+- `--resume`: Resume from the latest checkpoint
+- `--resume-from`: Resume from a specific question index (0-based)
+- `--checkpoint`: Path to a specific checkpoint file to resume from
+- `--save-every`: Save checkpoint every N questions (default: 5)
 
 #### LLM Parameters
 
@@ -127,6 +134,26 @@ Using Chain of Thought with Self Consistency with custom parameters:
 python main.py --provider anthropic --technique cot_sc --traces 5 --temperature 0.2 --top-p 0.9
 ```
 
+Resume from the latest checkpoint:
+```bash
+python main.py --provider openai --technique direct --resume
+```
+
+Resume from a specific question index:
+```bash
+python main.py --provider openai --technique direct --resume-from 10
+```
+
+Resume from a specific checkpoint file:
+```bash
+python main.py --provider openai --technique direct --checkpoint results/checkpoints/openai_gpt-4_direct_latest.json
+```
+
+Save checkpoints more frequently:
+```bash
+python main.py --provider openai --technique direct --save-every 1
+```
+
 ## Dataset Format
 
 The dataset should be a JSON file containing a list of dictionaries, each with the following keys:
@@ -166,6 +193,39 @@ The system stores comprehensive information about each evaluation run:
   - Error messages if applicable
 
 This information is valuable for debugging and analyzing model performance.
+
+## Robustness Features
+
+The system includes several features to ensure robustness when working with large datasets:
+
+### Graceful Keyboard Interrupt Handling
+
+You can safely interrupt the evaluation process at any time by pressing Ctrl+C. The system will:
+- Complete the current question evaluation
+- Save all results processed so far
+- Exit gracefully
+
+Pressing Ctrl+C twice will force an immediate exit.
+
+### Incremental Saving
+
+Results are saved incrementally during processing:
+- By default, a checkpoint is saved every 5 questions
+- You can adjust this frequency with the `--save-every` parameter
+- Checkpoints are stored in the `results/checkpoints` directory
+- Each checkpoint contains all results processed so far and progress information
+
+### Resume Functionality
+
+You can resume an interrupted evaluation in several ways:
+- `--resume`: Automatically find and resume from the latest checkpoint
+- `--resume-from`: Resume from a specific question index
+- `--checkpoint`: Resume from a specific checkpoint file
+
+This is particularly useful for:
+- Recovering from unexpected errors or interruptions
+- Running evaluations in multiple sessions
+- Continuing after API rate limits are hit
 
 ## Project Structure
 

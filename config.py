@@ -9,18 +9,18 @@ load_dotenv(find_dotenv())
 
 # API keys for different providers
 API_KEYS = {
-    "openai": "your-openai-api-key",
+    "openai": os.getenv("OPENAI_API_KEY", "your-openai-api-key"),
     "anthropic": os.getenv("ANTHROPIC_API_KEY", "your-anthropic-api-key"),
-    "gemini": "your-gemini-api-key",
-    "openrouter": "your-openrouter-api-key"
+    "gemini": os.getenv("GEMINI_API_KEY", "your-gemini-api-key"),
+    "openrouter": os.getenv("OPENROUTER_API_KEY", "your-openrouter-api-key")
 }
 
 # Default models for each provider
 DEFAULT_MODELS = {
-    "openai": "gpt-4",
+    "openai": "gpt-4o",
     "anthropic": "claude-3-7-sonnet-20250219",
-    "gemini": "gemini-1.5-pro",
-    "openrouter": "openai/gpt-4"
+    "gemini": "gemini-2.5-flash-preview-04-17",
+    "openrouter": "qwen/qwen-2.5-72b-instruct:free"
 }
 
 # Default parameters for API calls
