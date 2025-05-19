@@ -1,0 +1,82 @@
+[
+  {
+    "description": "JEE Main 2022 Paper 1",
+    "index": 1,
+    "subject": "math",
+    "type": "MCQ",
+    "question": "If the sum of the first 20 terms of the series 1 + 3 + 5 + ... is equal to the sum of the first n terms of the series 2 + 4 + 6 + ..., then the value of n is:\nA) 10\nB) 15\nC) 20\nD) 25",
+    "gold": "B"
+  },
+  {
+    "description": "JEE Main 2022 Paper 1",
+    "index": 2,
+    "subject": "phy",
+    "type": "MCQ",
+    "question": "A particle is moving in a circular path of radius R under the action of a force F = -kr with k > 0. The time period of the motion is:\nA) 2π√(m/k)\nB) 2π√(k/m)\nC) π√(m/k)\nD) π√(k/m)",
+    "gold": "A"
+  },
+  {
+    "description": "JEE Main 2022 Paper 1",
+    "index": 3,
+    "subject": "chem",
+    "type": "MCQ",
+    "question": "Which of the following is the correct order of increasing bond angle?\nA) NH3 < H2O < BF3\nB) H2O < NH3 < BF3\nC) BF3 < NH3 < H2O\nD) BF3 < H2O < NH3",
+    "gold": "B"
+  },
+  {
+    "description": "JEE Main 2022 Paper 2",
+    "index": 4,
+    "subject": "math",
+    "type": "MCQ(multiple)",
+    "question": "If f(x) = x³ - 3x² + 3x - 1, then which of the following statements is/are correct?\nA) f(x) is an increasing function for all x\nB) f(x) has a local minimum at x = 1\nC) f(x) has a local maximum at x = 1\nD) f'(x) = 0 has exactly one solution",
+    "gold": "AD"
+  },
+  {
+    "description": "JEE Main 2022 Paper 2",
+    "index": 5,
+    "subject": "phy",
+    "type": "Integer",
+    "question": "A particle of mass 1 kg is moving along the x-axis under the influence of a force F(x) = -2x. If the particle is released from rest at x = 10 m, its speed (in m/s) when it reaches x = 5 m is __________.",
+    "gold": "13"
+  },
+  {
+    "description": "JEE Main 2022 Paper 2",
+    "index": 6,
+    "subject": "chem",
+    "type": "Numeric",
+    "question": "The pH of a 0.001 M solution of HCl at 25°C is __________. (Round off to 2 decimal places)",
+    "gold": "3.00"
+  },
+  {
+    "description": "JEE Main 2022 Paper 3",
+    "index": 7,
+    "subject": "math",
+    "type": "Integer",
+    "question": "The number of ways in which 5 distinct objects can be distributed into 3 distinct boxes such that no box remains empty is __________.",
+    "gold": "150"
+  },
+  {
+    "description": "JEE Main 2022 Paper 3",
+    "index": 8,
+    "subject": "phy",
+    "type": "MCQ(multiple)",
+    "question": "Which of the following statements is/are correct regarding electromagnetic waves?\nA) The energy in an electromagnetic wave is divided equally between electric and magnetic fields\nB) Electromagnetic waves do not require a medium for propagation\nC) The electric and magnetic field vectors are parallel to each other\nD) The speed of electromagnetic waves in vacuum is independent of their wavelength",
+    "gold": "ABD"
+  },
+  {
+    "description": "JEE Main 2022 Paper 3",
+    "index": 9,
+    "subject": "chem",
+    "type": "Numeric",
+    "question": "The standard reduction potential for Zn²⁺/Zn is -0.76 V and that for Cu²⁺/Cu is 0.34 V. The standard cell potential (in volts) for the cell Zn|Zn²⁺||Cu²⁺|Cu is __________.",
+    "gold": "1.10"
+  },
+  {
+    "description": "JEE Main 2022 Paper 4",
+    "index": 10,
+    "subject": "math",
+    "type": "MCQ",
+    "question": "If the vectors a = 3i + 2j - k, b = i - j + 2k, and c = 2i + αj + 3k are coplanar, then the value of α is:\nA) -1\nB) 0\nC) 1\nD) 2",
+    "gold": "C"
+  }
+]
