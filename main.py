@@ -32,7 +32,12 @@ from config import (
     DEFAULT_NUM_TRACES,
     DEFAULT_OUTPUT_DIR,
     DEFAULT_DATASET_PATH,
-    PARAM_DESCRIPTIONS
+    PARAM_DESCRIPTIONS,
+    DEFAULT_SLEEP_TIME,
+    DEFAULT_MAX_RETRIES,
+    DEFAULT_INITIAL_DELAY,
+    DEFAULT_BACKOFF_FACTOR,
+    DEFAULT_STOP_ON_ERROR
 )
 
 from collections import Counter
@@ -65,7 +70,12 @@ def run_evaluation(
     llm_params: Dict[str, Any] = None,
     resume_from: int = None,
     checkpoint_path: str = None,
-    save_every: int = 5  # Save every N questions
+    save_every: int = 5,  # Save every N questions
+    sleep_time: float = DEFAULT_SLEEP_TIME,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+    initial_delay: float = DEFAULT_INITIAL_DELAY,
+    backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
+    stop_on_error: bool = DEFAULT_STOP_ON_ERROR
 ) -> Dict[str, Any]:
     """
     Run evaluation on the dataset
@@ -174,6 +184,9 @@ def run_evaluation(
                         trace_response = provider.generate(
                             prompt=trace_prompt,
                             model=model_name,
+                            max_retries=max_retries,
+                            initial_delay=initial_delay,
+                            backoff_factor=backoff_factor,
                             **params
                         )
                         
@@ -223,7 +236,7 @@ def run_evaluation(
                     trace_answers.append(trace_answer)
                     
                     # Add delay to avoid rate limiting
-                    time.sleep(1)
+                    time.sleep(sleep_time)
                 
                 # Perform majority voting to determine the final answer
                 if question["type"] in ["MCQ", "MCQ(multiple)"]:
@@ -318,6 +331,9 @@ def run_evaluation(
                 response_data = provider.generate(
                     prompt=prompt,
                     model=model_name,
+                    max_retries=max_retries,
+                    initial_delay=initial_delay,
+                    backoff_factor=backoff_factor,
                     **params
                 )
                 
@@ -381,11 +397,49 @@ def run_evaluation(
                     print(f"Checkpoint saved: {checkpoint_path}")
                 
                 # Add delay to avoid rate limiting
-                time.sleep(1)
+                time.sleep(sleep_time)
                 
         except Exception as e:
-            print(f"Error processing question {i+1}: {str(e)}")
-            continue
+            error_message = str(e)
+            print(f"Error processing question {i+1}: {error_message}")
+            
+            # Save a checkpoint before potentially exiting
+            checkpoint_path = save_incremental_results(
+                results,
+                output_dir,
+                experiment_name,
+                i + 1,
+                len(dataset)
+            )
+            print(f"Checkpoint saved: {checkpoint_path}")
+            
+            if stop_on_error:
+                print(f"Stopping evaluation due to error (--stop-on-error flag is set)")
+                
+                # Add error information to the results
+                error_info = {
+                    "error_type": "evaluation_stopped",
+                    "error_message": error_message,
+                    "question_index": i,
+                    "timestamp": time.time()
+                }
+                
+                # Calculate accuracy for the questions processed so far
+                accuracy = calculate_accuracy(results)
+                
+                # Print accuracy report for the questions processed so far
+                print_accuracy_report(accuracy)
+                
+                # Return early with partial results and error info
+                return {
+                    "results": results,
+                    "accuracy": accuracy,
+                    "error_info": error_info,
+                    "stopped_early": True
+                }
+            else:
+                # Continue to the next question
+                continue
     
     # Calculate accuracy
     accuracy = calculate_accuracy(results)
@@ -452,6 +506,20 @@ def main():
     parser.add_argument("--presence-penalty", type=float, help=PARAM_DESCRIPTIONS["presence_penalty"])
     parser.add_argument("--stop", type=str, nargs="+", help=PARAM_DESCRIPTIONS["stop"])
     
+    # API call parameters
+    parser.add_argument("--sleep-time", type=float, default=DEFAULT_SLEEP_TIME, 
+                        help=f"Delay between API calls in seconds (default: {DEFAULT_SLEEP_TIME})")
+    parser.add_argument("--max-retries", type=int, default=DEFAULT_MAX_RETRIES, 
+                        help=f"Maximum number of retries for API calls (default: {DEFAULT_MAX_RETRIES})")
+    parser.add_argument("--initial-delay", type=float, default=DEFAULT_INITIAL_DELAY, 
+                        help=f"Initial delay for retry backoff in seconds (default: {DEFAULT_INITIAL_DELAY})")
+    parser.add_argument("--backoff-factor", type=float, default=DEFAULT_BACKOFF_FACTOR, 
+                        help=f"Factor to increase delay on each retry (default: {DEFAULT_BACKOFF_FACTOR})")
+    
+    # Error handling parameters
+    parser.add_argument("--stop-on-error", action="store_true", 
+                        help="Stop evaluation on the first error encountered (after retries are exhausted)")
+    
     args = parser.parse_args()
     
     # Use default model if not specified
@@ -517,7 +585,12 @@ def main():
         llm_params=params,  # Pass the custom parameters
         resume_from=resume_from,
         checkpoint_path=checkpoint_path,
-        save_every=args.save_every
+        save_every=args.save_every,
+        sleep_time=args.sleep_time,
+        max_retries=args.max_retries,
+        initial_delay=args.initial_delay,
+        backoff_factor=args.backoff_factor,
+        stop_on_error=args.stop_on_error
     )
     
     print(f"Evaluation complete!")

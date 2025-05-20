@@ -102,6 +102,19 @@ You can customize LLM parameters directly from the command line:
 - `--presence-penalty`: Penalizes tokens already present (for OpenAI and OpenRouter)
 - `--stop`: Sequences where the API will stop generating further tokens
 
+#### API Call Parameters
+
+You can configure API call behavior with these parameters:
+
+- `--sleep-time`: Delay between API calls in seconds (default: 1.0)
+- `--max-retries`: Maximum number of retries for API calls (default: 3)
+- `--initial-delay`: Initial delay for retry backoff in seconds (default: 1.0)
+- `--backoff-factor`: Factor to increase delay on each retry (default: 2.0)
+
+#### Error Handling Parameters
+
+- `--stop-on-error`: Stop evaluation on the first error encountered (after retries are exhausted)
+
 ### Examples
 
 Evaluate OpenAI with direct prompting:
@@ -152,6 +165,11 @@ python main.py --provider openai --technique direct --checkpoint results/checkpo
 Save checkpoints more frequently:
 ```bash
 python main.py --provider openai --technique direct --save-every 1
+```
+
+Stop on the first error:
+```bash
+python main.py --provider anthropic --technique cot --stop-on-error
 ```
 
 ## Dataset Format
@@ -226,6 +244,37 @@ This is particularly useful for:
 - Recovering from unexpected errors or interruptions
 - Running evaluations in multiple sessions
 - Continuing after API rate limits are hit
+
+### Robust Error Handling
+
+The system includes comprehensive error handling for API calls:
+
+#### Automatic Retries with Exponential Backoff
+- Automatically retries failed API calls with exponential backoff
+- Distinguishes between different types of errors:
+  - Timeout errors: Network timeouts when calling the API
+  - Connection errors: Issues with establishing a connection
+  - Rate limit errors: When the API provider enforces rate limits
+  - API errors: Other errors returned by the API
+- Configurable retry parameters:
+  - Maximum number of retries
+  - Initial delay before first retry
+  - Backoff factor to increase delay between retries
+
+#### Detailed Error Reporting
+- Captures detailed information about each error:
+  - Error type (timeout, connection, rate limit, API error)
+  - Error message from the provider
+  - Number of retry attempts made
+- Stores error information in the results for later analysis
+
+#### Graceful Failure Handling
+- When all retries are exhausted, the system:
+  - Records the error information
+  - Saves a checkpoint with the current progress
+  - By default, continues to the next question
+  - With `--stop-on-error` flag, stops evaluation and returns partial results
+  - Ensures no data is lost due to API failures
 
 ## Project Structure
 

@@ -76,3 +76,14 @@ DEFAULT_OUTPUT_DIR = "results"
 
 # Default dataset path
 DEFAULT_DATASET_PATH = "dataset.json"
+
+# Default delay between API calls (in seconds)
+DEFAULT_SLEEP_TIME = 1.0
+
+# Default retry parameters
+DEFAULT_MAX_RETRIES = 3
+DEFAULT_INITIAL_DELAY = 1.0
+DEFAULT_BACKOFF_FACTOR = 2.0
+
+# Default behavior for stopping on errors
+DEFAULT_STOP_ON_ERROR = False
